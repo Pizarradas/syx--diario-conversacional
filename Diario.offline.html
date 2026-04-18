@@ -1,0 +1,112 @@
+<!doctype html>
+<html lang="es" data-syx-theme="example-01">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>Diario — Noticias conversacionales</title>
+<link rel="stylesheet" href="../../colors_and_type.css"/>
+<link rel="stylesheet" href="../shared.css"/>
+<style>
+  html, body { height: 100%; margin: 0; background: var(--semantic-color-bg-secondary); }
+  body { overflow: hidden; }
+  #root {
+    height: 100vh; height: 100dvh;
+    display: flex; flex-direction: column;
+    background: var(--semantic-color-bg-primary);
+  }
+  ::-webkit-scrollbar { width: 10px; height: 10px; }
+  ::-webkit-scrollbar-thumb { background: var(--primitive-color-gray-200); border-radius: 8px; }
+  ::-webkit-scrollbar-thumb:hover { background: var(--primitive-color-gray-300); }
+  @keyframes pulse {
+    0%,100% { opacity: 1; transform: scale(1); }
+    50%     { opacity: .45; transform: scale(.82); }
+  }
+  [data-density="compact"] { --chat-gap: 10px; }
+  [data-density="comfortable"] { --chat-gap: 18px; }
+  /* Only horizontal scroll allowed inside messages if it truly overflows */
+  .syx a { text-decoration: none; }
+</style>
+</head>
+<body class="syx">
+  <div id="root"></div>
+
+  <!-- React + Babel (pinned) -->
+  <script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+  <script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+  <script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+
+  <!-- App components -->
+  <script type="text/babel" src="ChatShell.jsx"></script>
+  <script type="text/babel" src="Bubbles.jsx"></script>
+  <script type="text/babel" src="feed.jsx"></script>
+  <script type="text/babel" src="NewsViews.jsx"></script>
+  <script type="text/babel" src="Chat.jsx"></script>
+
+  <script type="text/babel">
+    // Root — density tweak + edit-mode wiring
+    function App() {
+      const [density, setDensity] = React.useState(
+        (window.TWEAK_DEFAULTS && window.TWEAK_DEFAULTS.density) || 'comfortable'
+      );
+      const [editMode, setEditMode] = React.useState(false);
+      React.useEffect(() => {
+        document.documentElement.dataset.density = density;
+      }, [density]);
+
+      React.useEffect(() => {
+        const onMsg = (e) => {
+          const d = e.data || {};
+          if (d.type === '__activate_edit_mode')   setEditMode(true);
+          if (d.type === '__deactivate_edit_mode') setEditMode(false);
+        };
+        window.addEventListener('message', onMsg);
+        window.parent.postMessage({type:'__edit_mode_available'}, '*');
+        return () => window.removeEventListener('message', onMsg);
+      }, []);
+
+      const setDensityPersisted = (d) => {
+        setDensity(d);
+        window.parent.postMessage({type:'__edit_mode_set_keys', edits:{density:d}}, '*');
+      };
+
+      return (
+        <>
+          <Chat density={density}
+                setDensity={setDensityPersisted}/>
+          {editMode && (
+            <TweakPanel density={density}
+                        setDensity={setDensityPersisted}/>
+          )}
+        </>
+      );
+    }
+
+    function TweakPanel({ density, setDensity }) {
+      return (
+        <div style={{
+          position:'fixed', right:18, bottom:18, zIndex:100,
+          background:'#fff', border:'1px solid var(--semantic-color-border-subtle)',
+          borderRadius:14, padding:'14px 16px', boxShadow:'0 8px 30px -8px oklch(0 0 0 / 0.15)',
+          width:240,
+          fontFamily:'var(--semantic-font-family-primary)',
+        }}>
+          <div style={{fontSize:10, letterSpacing:'.12em', textTransform:'uppercase',
+                       fontWeight:800, color:'var(--semantic-color-primary)', marginBottom:10}}>
+            Tweaks
+          </div>
+          <label style={{display:'block', fontSize:11, fontWeight:600, marginBottom:6,
+                          color:'var(--semantic-color-text-secondary)'}}>
+            Densidad
+          </label>
+          <DensityToggle density={density} setDensity={setDensity}/>
+        </div>
+      );
+    }
+
+    // I need to fix Chat so its header density toggle calls back to App.
+    // The header is inside Chat; it already has its own toggle. Let's pipe it through.
+    const root = ReactDOM.createRoot(document.getElementById('root'));
+    root.render(<App/>);
+  </script>
+</body>
+</html>
